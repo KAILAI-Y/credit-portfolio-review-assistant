@@ -11,6 +11,12 @@ How do observed next-month default-label rates vary across customer segments, an
 - Candidate review-scope comparison and incremental workload analysis.
 - Reconciliation assertions and an English management report.
 
+The notebook's calculations call the shared `core/` modules (`core/metrics.py`,
+`core/validator.py`, `core/review_scopes.py`) instead of duplicating the logic
+inline, so the notebook and any future application share one implementation.
+These modules are covered by the automated tests in `tests/` (run with
+`python -m pytest` from the repository root).
+
 | Scope | Clients selected | Positive labels selected | Historical positive-label coverage |
 | --- | ---: | ---: | ---: |
 | PAY_0 >= 2 | 3,130 | 2,177 | 32.81% |
@@ -40,4 +46,4 @@ On Windows, activate with `.venv\Scripts\activate` instead. Select the environme
 
 The data describes Taiwanese clients with April–September 2005 history and a next-month outcome label. The PDF is the previously delivered report; refreshed notebook outputs are generated from the bundled CSV.
 
-Verified on 2026-09-12 using Python 3.11 and the pinned dependencies: all 22 code cells executed from a fresh kernel, both charts rendered, and reconciliation checks passed. The data loader was checked from both the repository root and the notebook directory.
+Verified on 2026-09-12 using Python 3.11 and the pinned dependencies: all 23 code cells executed from a fresh kernel, both charts rendered, and reconciliation checks passed, matching the results before the notebook was refactored to call the shared `core/` modules. The data loader and `core/` imports were checked from both the repository root and the notebook directory.
