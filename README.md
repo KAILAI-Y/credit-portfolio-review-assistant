@@ -47,3 +47,36 @@ On Windows, activate with `.venv\Scripts\activate` instead. Select the environme
 The data describes Taiwanese clients with April–September 2005 history and a next-month outcome label. The PDF is the previously delivered report; refreshed notebook outputs are generated from the bundled CSV.
 
 Verified on 2026-09-12 using Python 3.11 and the pinned dependencies: all 23 code cells executed from a fresh kernel, both charts rendered, and reconciliation checks passed, matching the results before the notebook was refactored to call the shared `core/` modules. The data loader and `core/` imports were checked from both the repository root and the notebook directory.
+
+## Claude API configuration
+
+Report generation (see `SPECS.md` FR-04) calls Claude through the official
+`anthropic` Python SDK, included in `requirements.txt` alongside
+`python-dotenv` for explicit `.env` loading.
+
+### Setup
+
+1. Copy the example environment file (never commit `.env`; it is already
+   listed in `.gitignore`):
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Edit `.env` and set:
+   - `ANTHROPIC_API_KEY` — your Anthropic API key.
+   - `ANTHROPIC_MODEL` — the model ID to use (for example `claude-opus-5`).
+
+### Verify connectivity
+
+With the virtual environment active and dependencies installed, run:
+
+```bash
+python scripts/check_claude_api.py
+```
+
+The script loads `.env`, sends one short synthetic prompt with a small
+output-token limit, and prints a concise success or failure message. It
+never prints the API key or any other credential value. A missing or
+invalid key or model produces a clear error instead of a silent failure or
+an unnecessary API call.
