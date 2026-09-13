@@ -31,7 +31,7 @@ Expanding the scope selects 3,688 additional clients and 1,252 additional positi
 
 ## Data and notebook usage
 
-The full 30,000-client dataset is included in `data/UCI_Credit_Card.csv`, converted from the original [UCI spreadsheet](https://doi.org/10.24432/C55S3H). See [data provenance and CC BY 4.0 attribution](data/README.md) for the conversion details. No Kaggle account or separate data download is needed.
+The full 30,000-client dataset is included in `data/UCI_Credit_Card.csv.
 
 From the repository root (Python 3.11 or newer):
 
