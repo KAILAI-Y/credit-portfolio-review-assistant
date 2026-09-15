@@ -25,6 +25,28 @@ in `tests/` (run with `python -m pytest` from the repository root).
 
 Expanding the scope selects 3,688 additional clients and 1,252 additional positive labels. The overall sample contains 30,000 clients and 6,636 positive labels (22.12%).
 
+## Application screenshots
+
+Captured from the running application using the historical sample and an existing AI draft, without a new API call.
+
+### Portfolio overview
+
+Data-quality warnings, 30,000 clients, and the 22.12% baseline provide context for repayment-status comparisons.
+
+![Portfolio overview](docs/screenshots/portfolio-overview.png)
+
+### Review-scope comparison
+
+Scope B adds 3,688 clients and 18.87 percentage points of historical positive-label coverage relative to Scope A. These exploratory comparisons describe workload and coverage, not defaults prevented.
+
+![Review scopes and incremental workload](docs/screenshots/review-scopes.png)
+
+### AI draft and citation review
+
+Generates report drafts from calculated portfolio summaries, checks source IDs, and supports Markdown export. Drafts require human review before use.
+
+![Raw AI draft and citation check](docs/screenshots/citation-review.png)
+
 ## Deliverables
 
 - [Analysis notebook](analysis/notebooks/credit-card-portfolio-risk-review.ipynb)
@@ -72,33 +94,7 @@ page shows an inline notice and the button is not displayed.
 
 ### Citation validation
 
-Every generated draft is checked offline, without another API call, by
-`app/citation_validator.py`'s `validate_citations()`. It parses each
-`(source: <source_id>)` citation in the draft — including comma/semicolon-
-separated and repeated `source:`-prefixed multi-source citations — and
-confirms every cited ID matches one of the IDs actually present in that
-report's context: a `sections[*].source_id`, or a supported metadata key
-(`dataset_context`, `data_quality`, `limitations`,
-`credit_limit_band_definitions`) only when that key is actually present.
-Validation fails the whole draft on an unknown ID, an empty or malformed
-citation, an unclosed `(source: ...` group, or a draft with no citations at
-all.
-
-Validation issues are shown beside the draft, and the "Download draft as
-Markdown" button is disabled whenever validation fails. A failed check is
-never retried automatically — generating another draft always requires a
-new, explicit click of "Generate report draft".
-
-**Passing citation validation only confirms that a cited ID exists in the
-underlying context.** It does not confirm that the draft's statements are
-factually accurate, or that any individual citation actually supports the
-claim it is attached to — every draft still requires human review before
-use. Recorded evaluation outcomes (model, prompt version, and findings from
-prior review passes) are tracked in [`evals/results.md`](evals/results.md).
-A worked example of this human-review step is saved at
-[`evals/examples/sonnet-v5-human-reviewed.md`](evals/examples/sonnet-v5-human-reviewed.md),
-a hand-corrected copy of the raw draft at
-[`evals/examples/sonnet-v5-reviewed.md`](evals/examples/sonnet-v5-reviewed.md).
+Source IDs are checked offline. Invalid or missing citations block Markdown export. A passing check confirms source-ID validity, not factual accuracy or whether a citation supports a claim; drafts require human review.
 
 ## Claude API configuration
 
@@ -127,8 +123,3 @@ With the virtual environment active and dependencies installed, run:
 python scripts/check_claude_api.py
 ```
 
-The script loads `.env`, sends one short synthetic prompt with a small
-output-token limit, and prints a concise success or failure message. It
-never prints the API key or any other credential value. A missing or
-invalid key or model produces a clear error instead of a silent failure or
-an unnecessary API call.
