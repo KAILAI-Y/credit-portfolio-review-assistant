@@ -27,6 +27,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from app.assistant import ReportGenerationError, generate_report_draft  # noqa: E402
+from app.citation_validator import validate_citations  # noqa: E402
 from app.report_context import build_report_context  # noqa: E402
 from core.metrics import (  # noqa: E402
     LIMIT_BAND_LABELS,
@@ -282,6 +283,8 @@ REPORT_MODEL = os.environ.get("ANTHROPIC_MODEL")
 
 if "report_draft" not in st.session_state:
     st.session_state.report_draft = None
+if "citation_validation" not in st.session_state:
+    st.session_state.citation_validation = None
 
 if not REPORT_API_KEY or not REPORT_MODEL:
     st.info(
@@ -301,9 +304,24 @@ else:
                 st.error(str(e))
             else:
                 st.session_state.report_draft = new_draft
+                # Validated once, offline, against the same context the draft
+                # was grounded in - never re-sent to the API on failure; a
+                # failed check is surfaced for human review, not auto-retried.
+                st.session_state.citation_validation = validate_citations(
+                    new_draft.draft_markdown, report_context
+                )
                 just_generated = True
 
     draft = st.session_state.report_draft
+    validation = st.session_state.citation_validation
+    if draft is not None and validation is None:
+        # A draft with no stored validation (e.g. session state from before
+        # offline citation validation existed) is validated now, offline,
+        # against the current data - never by regenerating the draft or
+        # calling the API again.
+        validation = validate_citations(draft.draft_markdown, build_report_context(df))
+        st.session_state.citation_validation = validation
+
     if draft is not None:
         if just_generated:
             st.success("Report draft generated.")
@@ -311,10 +329,32 @@ else:
             f"**Draft - requires review.** Model: `{draft.model}` | "
             f"Prompt version: `{draft.prompt_version}`"
         )
-        st.markdown(draft.draft_markdown)
+
+        draft_col, validation_col = st.columns([3, 1])
+        with draft_col:
+            st.markdown(draft.draft_markdown)
+        with validation_col:
+            st.subheader("Citation check")
+            if validation.is_valid:
+                # st.info, not st.success: this banner isn't tied to a fresh
+                # generation event, so it must not be confused with (or
+                # accidentally counted alongside) the one-time "Report draft
+                # generated." success message above.
+                st.info("All citations reference a known source ID.")
+            else:
+                st.error("Citation validation failed.")
+                for issue in validation.issues:
+                    st.warning(issue)
+            st.caption(
+                "This only confirms each cited ID exists - it does not "
+                "confirm the draft is factually accurate, or that any "
+                "given citation actually supports the claim beside it."
+            )
+
         st.download_button(
             "Download draft as Markdown",
             data=draft.draft_markdown,
             file_name="portfolio_report_draft.md",
             mime="text/markdown",
+            disabled=not validation.is_valid,
         )

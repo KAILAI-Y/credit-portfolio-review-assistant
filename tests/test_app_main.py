@@ -539,6 +539,169 @@ def test_existing_env_vars_are_not_overridden_by_dotenv_file(monkeypatch, tmp_pa
     assert os.environ["ANTHROPIC_MODEL"] == "real-shell-model"
 
 
+# --- offline citation validation (beside the draft, gates the download) -----
+
+
+def test_valid_citations_show_pass_and_enable_download(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_API_KEY)
+    monkeypatch.setenv("ANTHROPIC_MODEL", FAKE_MODEL)
+    mock_generate = MagicMock(
+        return_value=_fake_draft(
+            "## Executive Summary\nBody (source: portfolio_overview)."
+        )
+    )
+    monkeypatch.setattr(assistant_module, "generate_report_draft", mock_generate)
+
+    at = AppTest.from_file(str(APP_PATH)).run(timeout=30)
+    at.button[0].click().run(timeout=30)
+
+    assert not at.exception
+    assert any("known source id" in i.value.lower() for i in at.info)
+    assert len(at.error) == 0
+    assert len(at.download_button) == 1
+    assert at.download_button[0].proto.disabled is False
+
+
+def test_unknown_citation_shows_failure_and_disables_download(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_API_KEY)
+    monkeypatch.setenv("ANTHROPIC_MODEL", FAKE_MODEL)
+    mock_generate = MagicMock(
+        return_value=_fake_draft(
+            "## Executive Summary\nBody (source: not_a_real_source_id)."
+        )
+    )
+    monkeypatch.setattr(assistant_module, "generate_report_draft", mock_generate)
+
+    at = AppTest.from_file(str(APP_PATH)).run(timeout=30)
+    at.button[0].click().run(timeout=30)
+
+    assert not at.exception
+    assert any("citation validation failed" in e.value.lower() for e in at.error)
+    assert any("not_a_real_source_id" in w.value for w in at.warning)
+    assert len(at.download_button) == 1
+    assert at.download_button[0].proto.disabled is True
+
+
+def test_draft_with_no_citations_shows_failure_and_disables_download(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_API_KEY)
+    monkeypatch.setenv("ANTHROPIC_MODEL", FAKE_MODEL)
+    mock_generate = MagicMock(
+        return_value=_fake_draft("## Executive Summary\nNo citation at all here.")
+    )
+    monkeypatch.setattr(assistant_module, "generate_report_draft", mock_generate)
+
+    at = AppTest.from_file(str(APP_PATH)).run(timeout=30)
+    at.button[0].click().run(timeout=30)
+
+    assert not at.exception
+    assert any("citation validation failed" in e.value.lower() for e in at.error)
+    assert any("no citations" in w.value.lower() for w in at.warning)
+    assert at.download_button[0].proto.disabled is True
+
+
+def test_citation_check_never_triggers_a_second_generation_call(monkeypatch):
+    # A failed citation check must never automatically retry the API - only
+    # a fresh, explicit button click may call generate_report_draft again.
+    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_API_KEY)
+    monkeypatch.setenv("ANTHROPIC_MODEL", FAKE_MODEL)
+    mock_generate = MagicMock(
+        return_value=_fake_draft("## Executive Summary\nNo citation at all here.")
+    )
+    monkeypatch.setattr(assistant_module, "generate_report_draft", mock_generate)
+
+    at = AppTest.from_file(str(APP_PATH)).run(timeout=30)
+    at.button[0].click().run(timeout=30)
+    assert mock_generate.call_count == 1
+
+    at.run(timeout=30)
+
+    assert not at.exception
+    assert mock_generate.call_count == 1
+
+
+def test_citation_check_caption_clarifies_it_is_not_a_factual_accuracy_check(
+    monkeypatch,
+):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_API_KEY)
+    monkeypatch.setenv("ANTHROPIC_MODEL", FAKE_MODEL)
+    mock_generate = MagicMock(return_value=_fake_draft())
+    monkeypatch.setattr(assistant_module, "generate_report_draft", mock_generate)
+
+    at = AppTest.from_file(str(APP_PATH)).run(timeout=30)
+    at.button[0].click().run(timeout=30)
+
+    assert not at.exception
+    captions = " ".join(c.value.lower() for c in at.caption)
+    assert "factually accurate" in captions
+    assert "supports the claim" in captions
+
+
+# --- legacy session state: a draft saved before citation validation existed -
+
+
+def test_legacy_draft_with_no_stored_validation_is_validated_offline(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_API_KEY)
+    monkeypatch.setenv("ANTHROPIC_MODEL", FAKE_MODEL)
+    mock_generate = MagicMock()
+    monkeypatch.setattr(assistant_module, "generate_report_draft", mock_generate)
+
+    at = AppTest.from_file(str(APP_PATH)).run(timeout=30)
+    # Simulate session state carried over from before offline citation
+    # validation existed: a draft is present, but citation_validation is
+    # still the initial None - never populated by a generate_report_draft
+    # call in this test.
+    at.session_state["report_draft"] = _fake_draft(
+        "## Executive Summary\nBody (source: portfolio_overview)."
+    )
+    at.run(timeout=30)
+
+    assert not at.exception
+    mock_generate.assert_not_called()  # never regenerated or re-called the API
+    assert any("Executive Summary" in md.value for md in at.markdown)
+    assert any("known source id" in i.value.lower() for i in at.info)
+    assert at.download_button[0].proto.disabled is False
+
+
+def test_legacy_draft_with_no_stored_validation_and_bad_citation_is_rejected(
+    monkeypatch,
+):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_API_KEY)
+    monkeypatch.setenv("ANTHROPIC_MODEL", FAKE_MODEL)
+    mock_generate = MagicMock()
+    monkeypatch.setattr(assistant_module, "generate_report_draft", mock_generate)
+
+    at = AppTest.from_file(str(APP_PATH)).run(timeout=30)
+    at.session_state["report_draft"] = _fake_draft(
+        "## Executive Summary\nBody (source: not_a_real_source_id)."
+    )
+    at.run(timeout=30)
+
+    assert not at.exception
+    mock_generate.assert_not_called()
+    assert any("Executive Summary" in md.value for md in at.markdown)  # draft kept
+    assert any("citation validation failed" in e.value.lower() for e in at.error)
+    assert at.download_button[0].proto.disabled is True
+
+
+def test_legacy_validation_result_is_cached_and_not_recomputed_every_rerun(
+    monkeypatch,
+):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_API_KEY)
+    monkeypatch.setenv("ANTHROPIC_MODEL", FAKE_MODEL)
+    monkeypatch.setattr(assistant_module, "generate_report_draft", MagicMock())
+
+    at = AppTest.from_file(str(APP_PATH)).run(timeout=30)
+    at.session_state["report_draft"] = _fake_draft(
+        "## Executive Summary\nBody (source: portfolio_overview)."
+    )
+    at.run(timeout=30)
+    first_validation = at.session_state["citation_validation"]
+    assert first_validation is not None
+
+    at.run(timeout=30)
+    assert at.session_state["citation_validation"] == first_validation
+
+
 def test_initial_page_load_still_makes_zero_api_calls_with_dotenv_configured(
     monkeypatch, tmp_path
 ):

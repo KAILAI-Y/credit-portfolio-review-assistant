@@ -13,9 +13,10 @@ How do observed next-month default-label rates vary across customer segments, an
 
 The notebook's calculations call the shared `core/` modules (`core/metrics.py`,
 `core/validator.py`, `core/review_scopes.py`) instead of duplicating the logic
-inline, so the notebook and any future application share one implementation.
-These modules are covered by the automated tests in `tests/` (run with
-`python -m pytest` from the repository root).
+inline, so the notebook and the Streamlit application (`app/main.py`, see
+[AI report drafting application](#ai-report-drafting-application) below)
+share one implementation. These modules are covered by the automated tests
+in `tests/` (run with `python -m pytest` from the repository root).
 
 | Scope | Clients selected | Positive labels selected | Historical positive-label coverage |
 | --- | ---: | ---: | ---: |
@@ -31,7 +32,7 @@ Expanding the scope selects 3,688 additional clients and 1,252 additional positi
 
 ## Data and notebook usage
 
-The full 30,000-client dataset is included in `data/UCI_Credit_Card.csv.
+The full 30,000-client dataset is included in `data/UCI_Credit_Card.csv`.
 
 From the repository root (Python 3.11 or newer):
 
@@ -47,6 +48,57 @@ On Windows, activate with `.venv\Scripts\activate` instead. Select the environme
 The data describes Taiwanese clients with April–September 2005 history and a next-month outcome label. The PDF is the previously delivered report; refreshed notebook outputs are generated from the bundled CSV.
 
 Verified on 2026-09-12 using Python 3.11 and the pinned dependencies: all 23 code cells executed from a fresh kernel, both charts rendered, and reconciliation checks passed, matching the results before the notebook was refactored to call the shared `core/` modules. The data loader and `core/` imports were checked from both the repository root and the notebook directory.
+
+## AI report drafting application
+
+`app/main.py` is a Streamlit page that loads the bundled dataset, runs the
+same data-quality validation and portfolio/segment/review-scope analysis as
+the notebook (via `core/metrics.py`, `core/validator.py`,
+`core/review_scopes.py`), and adds an "AI report draft" section (FR-04).
+
+Start it from the repository root, with the virtual environment active:
+
+```bash
+streamlit run app/main.py
+```
+
+Clicking "Generate report draft" builds an aggregate-only JSON context
+(`app/report_context.py`'s `build_report_context()` — no individual client
+rows or IDs) and sends it to Claude via `app/assistant.py`'s
+`generate_report_draft()`. This requires `ANTHROPIC_API_KEY` and
+`ANTHROPIC_MODEL` to be configured (see
+[Claude API configuration](#claude-api-configuration) below); otherwise the
+page shows an inline notice and the button is not displayed.
+
+### Citation validation
+
+Every generated draft is checked offline, without another API call, by
+`app/citation_validator.py`'s `validate_citations()`. It parses each
+`(source: <source_id>)` citation in the draft — including comma/semicolon-
+separated and repeated `source:`-prefixed multi-source citations — and
+confirms every cited ID matches one of the IDs actually present in that
+report's context: a `sections[*].source_id`, or a supported metadata key
+(`dataset_context`, `data_quality`, `limitations`,
+`credit_limit_band_definitions`) only when that key is actually present.
+Validation fails the whole draft on an unknown ID, an empty or malformed
+citation, an unclosed `(source: ...` group, or a draft with no citations at
+all.
+
+Validation issues are shown beside the draft, and the "Download draft as
+Markdown" button is disabled whenever validation fails. A failed check is
+never retried automatically — generating another draft always requires a
+new, explicit click of "Generate report draft".
+
+**Passing citation validation only confirms that a cited ID exists in the
+underlying context.** It does not confirm that the draft's statements are
+factually accurate, or that any individual citation actually supports the
+claim it is attached to — every draft still requires human review before
+use. Recorded evaluation outcomes (model, prompt version, and findings from
+prior review passes) are tracked in [`evals/results.md`](evals/results.md).
+A worked example of this human-review step is saved at
+[`evals/examples/sonnet-v5-human-reviewed.md`](evals/examples/sonnet-v5-human-reviewed.md),
+a hand-corrected copy of the raw draft at
+[`evals/examples/sonnet-v5-reviewed.md`](evals/examples/sonnet-v5-reviewed.md).
 
 ## Claude API configuration
 

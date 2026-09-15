@@ -101,7 +101,8 @@ numbers or labels) and were verified with independently hand-calculated
 synthetic examples in `tests/test_report_context.py`, not against this
 dataset's own figures.
 
-report-draft-v5 has not yet been verified against a live model call.
+report-draft-v5 had not yet been verified against a live model call as
+of this entry - see the report-draft-v5 entries below, where it was.
 
 ## 2026-09-13 - report-draft-v5 - model: Claude Haiku 4.5
 
@@ -128,3 +129,94 @@ per the requesting instruction. A further prompt revision (e.g.
 requiring the draft to quote each `{pay0_code, client_count}` record
 inline rather than restating counts in free text) would need its own
 version bump and synthetic-data test before another live call.
+
+## 2026-09-13 - report-draft-v5 - model: Sonnet
+
+**Numeric checks passed; citation corrections required.**
+
+Numeric statements matched the supplied context (no invented,
+mis-transposed, or unverified highest/lowest values were found in this
+run). Citation formatting and/or citation IDs required correction
+before the draft's citations were all valid - see
+`app/citation_validator.py` (added this entry's session) for the
+offline, non-API check now run against every generated draft: it
+confirms each `(source: <source_id>)` citation names a real
+`sections[*].source_id` or supported metadata key, and that at least
+one citation is present. A passing citation check does not by itself
+confirm numeric accuracy, and vice versa - both were assessed
+separately for this entry.
+
+## 2026-09-15 - report-draft-v5 - model: Sonnet
+
+**Outcome: PASSED (one reviewed sample).** This confirms only that this
+specific draft's citations and numeric claims check out - it is not a
+general accuracy guarantee for future report-draft-v5 output.
+
+Source: a saved, unmodified Markdown draft downloaded from the running
+app (`portfolio_report_draft.md`, Downloads, generated 2026-09-15). The
+download does not carry a model identifier; it is recorded as Sonnet per
+the session that generated it, not from anything embedded in the file
+itself. Saved verbatim as
+[`evals/examples/sonnet-v5-reviewed.md`](examples/sonnet-v5-reviewed.md).
+
+**Citation validation (offline, no API call):** ran
+`app.citation_validator.validate_citations()` against
+`build_report_context()` on the bundled dataset. Result: `is_valid=True`,
+23 citations found, zero unknown IDs, zero malformed citations, zero
+unclosed citation groups - including two repeated-prefix multi-source
+citations (`source: review_scope_increment; source: computed_facts` and
+`source: limitations; source: data_quality`), both parsed correctly.
+
+**Numeric verification (manual cross-check against the calculated
+context, no API call):** every quantitative statement in the draft was
+compared against the corresponding `build_report_context()` value on the
+bundled dataset - portfolio overview (30,000 clients, 6,636 positive
+labels, 22.12%); all three repayment-status group counts, portfolio
+shares, label rates, and coverage figures; all four credit-limit band
+label rates and portfolio shares; the stratified highest/lowest label
+rates from `computed_facts.stratified_extrema` (70.74% max at `PAY_0 >=
+2` / `50,000-140,000`, 9.89% min at `PAY_0 <= 0` / `> 240,000`); the
+undocumented-code pairing from `computed_facts.undocumented_pay0_codes`
+(code -2 -> 2,759 clients, code 0 -> 14,737 clients, correctly paired);
+Scope A and Scope B's clients, workload share, label rate, and coverage;
+and the incremental population's client count, positive-label count,
+label rate, and percentage-point coverage gain. All matched exactly, and
+`coverage_gain` was correctly labeled in percentage points rather than a
+plain percentage.
+
+One drafting artifact, not a numeric error: the Scope B sentence reads
+"a label rate of 50.29%, and 50.29%... specifically 51.67% positive-label
+coverage" - both 50.29% (Scope B's own label rate) and 51.67% (its
+positive-label coverage) are individually correct and distinctly cited,
+but the sentence is awkwardly self-corrected mid-clause.
+
+No prompt or code change made for this entry. This is a single reviewed
+sample, not a live-model evaluation run over `evals/questions.json` and
+not evidence that every report-draft-v5 output will pass citation
+validation or numeric review.
+
+**Editorial correction applied (human review, no API call, no
+regeneration).** Source-ID citation validation and the numeric
+cross-check above both still passed; two wording issues were found on
+closer read and corrected by hand. Both versions are kept:
+[`evals/examples/sonnet-v5-reviewed.md`](examples/sonnet-v5-reviewed.md)
+is the original, unmodified raw draft;
+[`evals/examples/sonnet-v5-human-reviewed.md`](examples/sonnet-v5-human-reviewed.md)
+is the corrected, clearly human-edited copy. Only the two items below
+changed - no cited number, source ID, or other wording was altered.
+
+1. The Scope B sentence's mid-clause drafting artifact ("a label rate of
+   50.29%, and 50.29%... specifically 51.67% positive-label coverage")
+   was corrected to state each value once: a label rate of 50.29% and a
+   positive-label coverage of 51.67%. Both figures were already
+   individually correct; only the garbled duplication was removed.
+2. The Limitations section's undefined-rate explanation was corrected.
+   The original wording ("a segment with zero clients or zero positive
+   labels" makes a rate undefined) conflates two different cases: an
+   undefined rate depends on its own denominator being zero, not merely
+   a segment-level zero anywhere. A segment with zero clients has an
+   undefined label rate (0/0); a portfolio with zero positive labels
+   overall has undefined positive-label coverage. A segment with a
+   nonzero client count but zero positive labels instead has a real,
+   defined label rate of 0% - this case was previously, incorrectly,
+   implied to be undefined too.
