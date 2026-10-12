@@ -38,6 +38,7 @@ from core.metrics import (  # noqa: E402
     stratified_summary,
 )
 from core.review_scopes import SCOPE_A_LABEL, SCOPE_B_LABEL, compare_scopes  # noqa: E402
+from core.sql_analysis import reconciliation_report
 from core.validator import validate_portfolio  # noqa: E402
 
 DATA_PATH = REPO_ROOT / "data" / "UCI_Credit_Card.csv"
@@ -265,6 +266,21 @@ st.caption(
     "The additional population consists of clients selected by Scope B "
     "but not Scope A."
 )
+
+st.subheader("SQL/Python reconciliation")
+st.caption("Independent SQLite queries verify the calculated portfolio metrics. No AI API is required.")
+if st.button("Verify SQL/Python metrics"):
+    evidence = reconciliation_report(df)
+    st.session_state.sql_evidence = evidence
+if "sql_evidence" in st.session_state:
+    evidence = st.session_state.sql_evidence
+    if evidence["passed"].all():
+        st.success(f"All {len(evidence)} SQL/Python metric checks passed.")
+    else:
+        st.error("SQL/Python mismatch detected. Review the evidence before using the results.")
+    st.dataframe(evidence, hide_index=True)
+    st.download_button("Download reconciliation evidence", evidence.to_csv(index=False),
+                       file_name="sql-reconciliation.csv", mime="text/csv")
 
 st.subheader("AI report draft")
 st.caption(

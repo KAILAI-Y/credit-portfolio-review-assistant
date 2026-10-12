@@ -1,0 +1,10 @@
+{
+  "dataset_sha256": "f7b7d22d1f8dd27dadb25d4b78d8a4ae7c441ab6cc12d1ea58c0efc54d4d1788",
+  "checks": 92,
+  "passed": 92,
+  "baseline": {
+    "total_clients": 30000.0,
+    "positive_labels": 6636.0,
+    "label_rate": 0.2212
+  }
+}

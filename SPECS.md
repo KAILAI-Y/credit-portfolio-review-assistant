@@ -56,7 +56,7 @@ Allow the analyst to review and download the generated draft as Markdown. Clearl
 
 ## 5.1 Architecture Mapping
 
-These are planned implementation paths, not existing features.
+These paths map implemented application functionality; AI evaluations are recorded separately.
 
 - FR-01: `core/validator.py`.
 - FR-02: `core/metrics.py`.
@@ -98,3 +98,7 @@ Counts are checked exactly. Rates are checked using unrounded values with an app
 - Automated lending, credit-limit, or collections decisions.
 - Estimates of losses prevented or intervention effectiveness.
 - Production deployment, user accounts, and regulatory compliance assessment.
+
+## 9. SQL reconciliation enhancement
+
+FR-06: Independently calculate baseline, repayment and credit-limit stratified metrics, and candidate review scopes in SQLite. Validate inputs first; reconcile against Python with exact counts and rate tolerance of 1e-12. Export metric-level evidence and dataset fingerprint. Undefined rates remain unavailable. See `docs/business-acceptance.md`.

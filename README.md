@@ -25,6 +25,26 @@ in `tests/` (run with `python -m pytest` from the repository root).
 
 Expanding the scope selects 3,688 additional clients and 1,252 additional positive labels. The overall sample contains 30,000 clients and 6,636 positive labels (22.12%).
 
+## Credit systems analysis and delivery evidence
+
+The main deliverable is credit portfolio analysis: data-quality validation,
+repayment-status segmentation, and review workload versus historical outcome coverage.
+AI report drafting is optional; all analysis and reconciliation run without an API key.
+
+- [SQL reference queries](sql/portfolio.sql): baseline, repayment segments, credit-limit stratification, and review scopes.
+- [Business acceptance pack](docs/business-acceptance.md): requirements, field definitions, acceptance scenarios, and traceability.
+- [SQL/Python reconciliation evidence](analysis/reports/sql-reconciliation.csv): independently calculated metrics checked against the shared Python core.
+
+Run the offline verification from the repository root:
+
+```bash
+python scripts/reconcile_sql.py
+python -m pytest
+```
+
+The reconciliation runner exits nonzero on a mismatch and records a dataset SHA-256.
+This is a simulated consumer-credit workflow, not corporate lending experience or bank UAT sign-off.
+
 ## Application screenshots
 
 Captured from the running application using the historical sample and an existing AI draft, without a new API call.
