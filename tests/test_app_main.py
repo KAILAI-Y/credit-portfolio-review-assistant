@@ -374,7 +374,7 @@ def test_report_draft_shows_safe_message_when_not_configured():
     at = AppTest.from_file(str(APP_PATH)).run(timeout=30)
 
     assert not at.exception
-    assert len(at.button) == 0
+    assert not any(b.label == "Generate report draft" for b in at.button)
     assert any("not configured" in info.value.lower() for info in at.info)
     assert FAKE_API_KEY not in at.get("info")[0].value
 
@@ -389,7 +389,7 @@ def test_initial_load_makes_zero_report_generation_calls(monkeypatch):
 
     assert not at.exception
     mock_generate.assert_not_called()
-    assert len(at.button) == 1
+    assert sum(b.label == "Generate report draft" for b in at.button) == 1
     assert len(at.markdown) == 0
     assert len(at.download_button) == 0
 
@@ -401,7 +401,7 @@ def test_one_click_generates_one_call_and_shows_draft(monkeypatch):
     monkeypatch.setattr(assistant_module, "generate_report_draft", mock_generate)
 
     at = AppTest.from_file(str(APP_PATH)).run(timeout=30)
-    at.button[0].click().run(timeout=30)
+    next(b for b in at.button if b.label == "Generate report draft").click().run(timeout=30)
 
     assert not at.exception
     mock_generate.assert_called_once()
@@ -419,7 +419,7 @@ def test_rerun_preserves_draft_without_another_call_or_stale_success(monkeypatch
     monkeypatch.setattr(assistant_module, "generate_report_draft", mock_generate)
 
     at = AppTest.from_file(str(APP_PATH)).run(timeout=30)
-    at.button[0].click().run(timeout=30)
+    next(b for b in at.button if b.label == "Generate report draft").click().run(timeout=30)
     assert mock_generate.call_count == 1
 
     # A later rerun not caused by clicking "Generate report draft" again
@@ -442,7 +442,7 @@ def test_generation_failure_displays_safe_error_and_no_draft(monkeypatch):
     monkeypatch.setattr(assistant_module, "generate_report_draft", mock_generate)
 
     at = AppTest.from_file(str(APP_PATH)).run(timeout=30)
-    at.button[0].click().run(timeout=30)
+    next(b for b in at.button if b.label == "Generate report draft").click().run(timeout=30)
 
     assert not at.exception
     mock_generate.assert_called_once()
@@ -459,13 +459,13 @@ def test_failure_after_a_prior_success_keeps_old_draft_without_new_success(monke
     monkeypatch.setattr(assistant_module, "generate_report_draft", mock_generate)
 
     at = AppTest.from_file(str(APP_PATH)).run(timeout=30)
-    at.button[0].click().run(timeout=30)
+    next(b for b in at.button if b.label == "Generate report draft").click().run(timeout=30)
     assert any("Executive Summary" in md.value for md in at.markdown)
 
     mock_generate.side_effect = ReportGenerationError(
         "Report generation failed: rate limited."
     )
-    at.button[0].click().run(timeout=30)
+    next(b for b in at.button if b.label == "Generate report draft").click().run(timeout=30)
 
     assert not at.exception
     assert mock_generate.call_count == 2
@@ -507,7 +507,7 @@ def test_config_loaded_from_dotenv_file_when_unset(monkeypatch, tmp_path):
     at = AppTest.from_file(str(APP_PATH)).run(timeout=30)
 
     assert not at.exception
-    assert len(at.button) == 1  # now configured: button is shown
+    assert sum(b.label == "Generate report draft" for b in at.button) == 1  # now configured: button is shown
     assert not any(
         "not configured" in info.value.lower() for info in at.info
     )
@@ -532,7 +532,7 @@ def test_existing_env_vars_are_not_overridden_by_dotenv_file(monkeypatch, tmp_pa
     at = AppTest.from_file(str(APP_PATH)).run(timeout=30)
 
     assert not at.exception
-    assert len(at.button) == 1
+    assert sum(b.label == "Generate report draft" for b in at.button) == 1
     # The pre-set (shell) values win; override=False must not let the
     # .env file's values replace them.
     assert os.environ["ANTHROPIC_API_KEY"] == "real-shell-key"
@@ -553,7 +553,7 @@ def test_valid_citations_show_pass_and_enable_download(monkeypatch):
     monkeypatch.setattr(assistant_module, "generate_report_draft", mock_generate)
 
     at = AppTest.from_file(str(APP_PATH)).run(timeout=30)
-    at.button[0].click().run(timeout=30)
+    next(b for b in at.button if b.label == "Generate report draft").click().run(timeout=30)
 
     assert not at.exception
     assert any("known source id" in i.value.lower() for i in at.info)
@@ -573,7 +573,7 @@ def test_unknown_citation_shows_failure_and_disables_download(monkeypatch):
     monkeypatch.setattr(assistant_module, "generate_report_draft", mock_generate)
 
     at = AppTest.from_file(str(APP_PATH)).run(timeout=30)
-    at.button[0].click().run(timeout=30)
+    next(b for b in at.button if b.label == "Generate report draft").click().run(timeout=30)
 
     assert not at.exception
     assert any("citation validation failed" in e.value.lower() for e in at.error)
@@ -591,7 +591,7 @@ def test_draft_with_no_citations_shows_failure_and_disables_download(monkeypatch
     monkeypatch.setattr(assistant_module, "generate_report_draft", mock_generate)
 
     at = AppTest.from_file(str(APP_PATH)).run(timeout=30)
-    at.button[0].click().run(timeout=30)
+    next(b for b in at.button if b.label == "Generate report draft").click().run(timeout=30)
 
     assert not at.exception
     assert any("citation validation failed" in e.value.lower() for e in at.error)
@@ -610,7 +610,7 @@ def test_citation_check_never_triggers_a_second_generation_call(monkeypatch):
     monkeypatch.setattr(assistant_module, "generate_report_draft", mock_generate)
 
     at = AppTest.from_file(str(APP_PATH)).run(timeout=30)
-    at.button[0].click().run(timeout=30)
+    next(b for b in at.button if b.label == "Generate report draft").click().run(timeout=30)
     assert mock_generate.call_count == 1
 
     at.run(timeout=30)
@@ -628,7 +628,7 @@ def test_citation_check_caption_clarifies_it_is_not_a_factual_accuracy_check(
     monkeypatch.setattr(assistant_module, "generate_report_draft", mock_generate)
 
     at = AppTest.from_file(str(APP_PATH)).run(timeout=30)
-    at.button[0].click().run(timeout=30)
+    next(b for b in at.button if b.label == "Generate report draft").click().run(timeout=30)
 
     assert not at.exception
     captions = " ".join(c.value.lower() for c in at.caption)
@@ -718,7 +718,16 @@ def test_initial_page_load_still_makes_zero_api_calls_with_dotenv_configured(
 
     assert not at.exception
     mock_generate.assert_not_called()
-    assert len(at.button) == 1
+    assert sum(b.label == "Generate report draft" for b in at.button) == 1
     assert len(at.markdown) == 0
     assert len(at.download_button) == 0
     assert len(at.success) == 0
+
+
+def test_sql_verification_without_ai_credentials():
+    at = AppTest.from_file(str(APP_PATH)).run(timeout=30)
+    next(b for b in at.button if b.label == "Verify SQL/Python metrics").click().run(timeout=30)
+    assert not at.exception
+    assert any("92 SQL/Python metric checks passed" in message.value for message in at.success)
+    assert at.dataframe[0].value["passed"].all()
+    assert any(button.label == "Download reconciliation evidence" for button in at.download_button)
